@@ -2,7 +2,17 @@ import numpy as np
 
 import units
 
-def set_disc(N):
+def setup(N,Mpt,config):
+    if config == 'cloud':
+        pos,vel = set_cloud(N)
+    elif config == 'disc':
+        pos,vel = set_disc(N,Mpt)
+    else:
+        print('Unrecognised config option, aborting.')
+        quit()
+    return pos,vel
+
+def set_disc(N,Mpt):
     """
     Setup particles in a rotating disc
         Parameters:
@@ -19,15 +29,11 @@ def set_disc(N):
 
     pos = np.random.randn(N,3)   # randomly selected positions and velocities
     pos[:,2] = 0 # set z positions to 0
-    #pos[ptmass,0] = np.zeros(3)
 
-    R = np.sqrt(pos[:,0]*pos[:,0] + pos[:,1]*pos[:,1]
-                + pos[:,2]*pos[:,2])
+    dr = np.sqrt(pos[:,0]*pos[:,0] + pos[:,1]*pos[:,1] + pos[:,2]*pos[:,2])
     phi  = np.arctan2(pos[:,1],pos[:,0])
 
-    G = units.G*units.umass*units.utime**2/units.udist**3
-
-    vmod = np.sqrt(G*2/R)
+    vmod = np.sqrt(Mpt/dr)
     vel = np.stack([-vmod*np.sin(phi), vmod*np.cos(phi), np.zeros(N)]).T
 
     return pos, vel

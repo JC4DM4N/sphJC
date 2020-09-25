@@ -8,7 +8,7 @@ class force:
     Calculates particle accelerations
     """
     @staticmethod
-    def getAcc(pos,vel,m,h,k,n,lmbda,nu):
+    def getAcc(pos,vel,m,Mpt,h,k,n,lmbda,nu):
         """
         Calculates the acceleration on each SPH particle
         Parameters:
@@ -43,7 +43,17 @@ class force:
         # pack together the acceleration components
         a = np.hstack((ax,ay,az))
 
+        # Add point mass contribution to accelerations
+        dr = np.sqrt(pos[:,0]*pos[:,0] + pos[:,1]*pos[:,1] + pos[:,2]*pos[:,2])
+        dr3 = dr**3
+        aptx = (-Mpt*pos[:,0]/dr3).reshape((N,1))
+        apty = (-Mpt*pos[:,1]/dr3).reshape((N,1))
+        aptz = (-Mpt*pos[:,2]/dr3).reshape((N,1))
+
+        # pack together the acceleration components
+        apt = np.hstack((aptx,apty,aptz))
+
         # Add external potential force and viscosity
-        a += -lmbda*pos - nu*vel
+        a += -lmbda*pos - nu*vel + apt
 
         return a
