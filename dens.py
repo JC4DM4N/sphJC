@@ -34,7 +34,7 @@ class dens:
         return dx, dy, dz
 
     @staticmethod
-    def getDensity(r,pos,m,h):
+    def getDensity(inp):
         """
         Calculates the density at sampling loctions from SPH particle distribution
             Parameters:
@@ -45,6 +45,7 @@ class dens:
             Returns:
                 rho (np.array, Mx1) : vector of accelerations
         """
+        r,pos,m,h = inp
 
         M = r.shape[0]
         dx, dy, dz = dens.getSeparations(r,pos)

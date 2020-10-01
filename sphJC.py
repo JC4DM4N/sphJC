@@ -1,13 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import gamma
+from multiprocessing import Pool
+import time as TIME
 
 from kernel import kernel
 from dens import dens
 from force import force
 from setup import *
 import units
-
 
 class sphJC:
     @staticmethod
@@ -17,7 +18,7 @@ class sphJC:
         t         = 0       # current time of the simulation
         tEnd      = 120     # time at which simulation ends
         dt        = 0.04    # timestep
-        N         = 400     # Number of particles
+        N         = 10000   # Number of particles
         Npt       = 1       # Number of point mass particles (star)
         M         = 1e-10   # mass in particles
         Mpt       = 2       # mass in star
@@ -25,9 +26,10 @@ class sphJC:
         h         = 0.1     # smoothing length
         k         = 0.1     # equation of state constant
         n         = 1       # polytropic index
-        nu        = 0.01    # damping
+        nu        = 1e-10   # damping
         plotRealTime = True # switch on for plotting as the simulation goes along
         config    = 'disc'  # supported options are 'disc' or 'cloud'
+        nproc     = 4       # number of multiprocessing threads
 
         # Generate Initial Conditions
         np.random.seed(52)            # set the random number generator seed
@@ -39,7 +41,12 @@ class sphJC:
         pos,vel = setup(N,Mpt,config)
 
         # calculate initial gravitational accelerations
-        acc = force.getAcc(pos,vel,m,Mpt,h,k,n,lmbda,nu)
+        pool = Pool(processes=nproc)
+        if __name__=='__main__':
+            pos_ = np.array_split(pos,nproc)
+            vel_ = np.array_split(vel,nproc)
+            acc = pool.map(force.getAcc, [(pos_[i],vel_[i],m,Mpt,h,k,n,lmbda,nu) for i in range(nproc)])
+        acc = np.concatenate(acc)
 
         # number of timesteps
         Nt = int(np.ceil(tEnd/dt))
@@ -60,18 +67,29 @@ class sphJC:
 
         # Simulation Main Loop
         for i in range(Nt):
+            tstart = TIME.time()
             # (1/2) kick
             vel += acc*dt/2
             # drift
             pos += vel*dt
             # update accelerations
-            acc = force.getAcc(pos,vel,m,Mpt,h,k,n,lmbda,nu)
+            if __name__=='__main__':
+                pos_ = np.array_split(pos,nproc)
+                vel_ = np.array_split(vel,nproc)
+                acc = pool.map(force.getAcc, [(pos_[i],vel_[i],m,Mpt,h,k,n,lmbda,nu) for i in range(nproc)])
+            acc = np.concatenate(acc)
             # (1/2) kick
             vel += acc*dt/2
             # update time
             t += dt
-            # get density for plottiny
-            rho = dens.getDensity(pos,pos,m,h)
+            # get density for plotting
+            if __name__=='__main__':
+                pos_ = np.array_split(pos,nproc)
+                rr_ = np.array_split(rr,nproc)
+                rho = pool.map(dens.getDensity, [(pos_[i],pos_[i],m,h) for i in range(nproc)])
+                rho_radial = pool.map(dens.getDensity,[(rr_[i],pos_[i],m,h) for i in range(nproc)])
+            rho = np.concatenate(rho)
+            rho_radial = np.concatenate(rho_radial)
             # plot in real time
             if plotRealTime or (i == Nt-1):
                 # Plot particle position
@@ -85,16 +103,22 @@ class sphJC:
                 ax1.set_yticks([-1,0,1])
                 ax1.set_facecolor('black')
                 ax1.set_facecolor((.1,.1,.1))
+                ax1.set_xlabel('x, AU')
+                ax1.set_ylabel('y, AU')
+                ax1.text(-1.5,3,
+                         'tot simulation time: %.1f yrs' %(t*units.utime/365.25/24./60./60.),
+                         fontsize=12)
+                ax1.text(-1.5,2.5,'time for iteration: %.3f s' %(TIME.time()-tstart),
+                         fontsize=12)
 
                 # Density plot
                 plt.sca(ax2)
                 plt.cla()
-                plt.xlabel('radius')
-                plt.ylabel('density')
+                plt.xlabel('Radius, AU')
+                plt.ylabel(r'Density, M$_{\odot}$AU$^{-3}$')
                 ax2.set(xlim=(0, 1), ylim=(0, 3))
                 ax2.set_aspect(0.1)
                 plt.plot(rlin, rho_analytic, color='gray', linewidth=2)
-                rho_radial = dens.getDensity(rr,pos,m,h)
                 plt.plot(rlin, rho_radial, color='blue')
                 plt.pause(0.001)
 
@@ -103,10 +127,12 @@ class sphJC:
                 L.append(np.linalg.norm(np.sum(AM,axis=0)))
                 time.append(t)
                 plt.sca(ax3)
-                plt.xlabel('time')
-                plt.ylabel(r'Angular momentum, $L=mv\times r$')
-                plt.plot(time,L,color='green')
-                ax3.set(ylim=(0, np.max(L)*1.5), xlim=(0,tEnd))
+                ax3.set_xlabel('time, yrs')
+                ax3.set_ylabel(r'Angular momentum, $L=mv\times r$')
+                plt.plot(np.asarray(time)*units.utime/365.25/24./60./60.,
+                         L,color='green')
+                ax3.set(ylim=(0, np.max(L)*3),
+                        xlim=(0,tEnd*units.utime/365.25/24./60./60.))
                 plt.pause(0.001)
 
 

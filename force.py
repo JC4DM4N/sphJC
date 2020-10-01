@@ -8,7 +8,7 @@ class force:
     Calculates particle accelerations
     """
     @staticmethod
-    def getAcc(pos,vel,m,Mpt,h,k,n,lmbda,nu):
+    def getAcc(inp):
         """
         Calculates the acceleration on each SPH particle
         Parameters:
@@ -23,10 +23,11 @@ class force:
         Returns:
             a (np.array, Nx3): particle accelerations
         """
+        pos,vel,m,Mpt,h,k,n,lmbda,nu = inp
         N = pos.shape[0]
 
         # Calculate densities at the position of the particles
-        rho = dens.getDensity(pos,pos,m,h)
+        rho = dens.getDensity((pos,pos,m,h))
 
         # Get the pressures
         P = dens.getPressure(rho,k,n)
